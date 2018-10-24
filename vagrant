@@ -1,0 +1,104 @@
+# -*- Criando um diretório de codinome 'Ansible_curso' -*-
+$ mkdir Ansible_curso
+
+# -*- Executando o comando vagrant init para gerar o Vagrantfile -*-
+$ vagrant init < nome_da_box >
+
+# -*- Ou gerando o arquivo Vagrantfile na mão -*-
+# Arquivo Vagrantfile:
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+Vagrant.configure("2") do |config|
+    config.vm.box = "centos/7"
+    #xconfig.vm.box_url = "http://atf.intranet.bb.com.br/artifactory/bb-vagrant-local/lnx/rhel/lnx-rhel.json"
+    config.vm.define :nd1 do |nd1_config|
+        nd1_config.vm.hostname = "node01"
+        nd1_config.vm.network :private_network, ip: "1.1.1.5"
+        #nd2_config.vm.network "private_network", ip: "1.1.1.5"
+    end
+    config.vm.define :nd2 do |nd2_config8|
+        nd2_config.vm.hostname = "node02"
+        nd2_config.network :private_network, ip: "1.1.1.6"
+        #nd2_config.vm.network "private_network", ip: "1.1.1.6"
+    end
+    config.vm.provider "virtualbox" do |vb|
+        vb.gui = true
+        vb.memory = "1024"
+    end
+end
+
+# -*- Alterando para usuario root -*-
+# -*- Instalando a versão mais recente do ansible Ansible-2.5 do próprio repositório do BB -*- 
+$ sudo su -
+
+$ wget -q http://bblinuxdg.intranet.bb.com.br/bblinuxdg/chaves-gpg/ansible-2.5.gpg -O- | apt-key add - 
+
+$ echo "deb [arch=amd64] http://bblinuxdg.intranet.bb.com.br/extra/ansible-2.5 xenial main" > /etc/apt/sources.list.d/ansible-2.5.list
+
+$ apt update
+
+$ apt-get install ansible 
+
+# -*- Perguntas (24/10) -*-
+#00) Criando um arquivo chamado host
+01) Usando o comando ADHOC, certifique-se que as maquinas nodes estão UP 
+02) Crie um playbook que habilite o servico de email nas maquinas nodes.
+03) Sem utilizar o modulo "copy" elabore um playbook para criar um arquivo "file.txt" em '/tmp' das maquinas nodes.
+    - Sinta-se livre para criar o conteudo que desejar para o arquivo
+04) Crie um playbook para adicionar um usuario chamado "bob" nas maquinas nodes, fazendo uso de variavel.
+05) Utilizando o modulo "copy" elabore um playbook que copie o arquivo "/tmp/file.txt" se, e somente se a maquina node for centos
+    - Versão 7
+06) Crie 03 arquivos no "/tmp" - (file.txt, file2.txt, file3.txt) e fazendo uso de loop, copie estes arquivos para o "/tmp" das maquinas nodes.
+
+# -*- Respostas -*- 
+01) ansible all -m ping -i hosts
+02) systemctl status postfix
+03) ---
+    - name: 'Criando arquivo via lineinfile'
+      host:all
+      become: yes
+      tasks:
+        - name: 'Criando arquivo na maquina node'
+          lineinfile:
+             dest: /tmp/file.txt
+             line: 'Arquivo criado via ansible'
+             create: yes
+             state: present
+04) ---
+    - name: 'Criando usuario nos nodes'
+      hosts: all
+      become: yes
+      vars:
+      - username: saturno
+
+      tasks:
+        - name: 'Criando Usuário'
+          user: name={{ username }} shell=/bin/bash createhome=yes
+05) ---
+    - name: 'Copiando arquivo para os nodes'
+      hosts: all
+      become: yes
+      tasks:
+        - name: 'Enviando arquivo para nos CentOS 7'
+          copy: src=/tmp/file.txt dest=/tmp/file.txt
+          when: (ansible_distribution == "CentOS" and ansible_distribution_major_version == "7") 
+06) ---
+    - name: 'Copiando arquivos para os nodes'
+      hosts: all
+      become: yes
+      tasks:
+        - name: 'Copiando arquivos...'
+          copy: src={{ item }} dest=/tmp/
+          with_items:
+            - file1.txt
+            - file2.txt
+            - file3.txt
+Bonus) ---
+       - name: 'Conta processos remotos em execucao'
+         hosts: all
+         become: yes
+         tasks:
+           - name: 'Contando processos..'
+             shell: "ps -ef | wc -l"
+             register: ps_count
+           - debug: var=ps_count.stdout_lines
